@@ -1,0 +1,171 @@
+@page
+@model PromptStudio.Pages.Prompts.ExecuteModel
+@{
+    ViewData["Title"] = $"Execute: {Model.PromptTemplate?.Name}";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar with prompt info -->
+        <div class="col-md-4 bg-light border-end vh-100">
+            <div class="p-3">
+                <div class="mb-3">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a asp-page="/Index">Collections</a></li>
+                            <li class="breadcrumb-item">@Model.PromptTemplate.Collection.Name</li>
+                            <li class="breadcrumb-item active">@Model.PromptTemplate.Name</li>
+                        </ol>
+                    </nav>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-lightning text-warning"></i>
+                            @Model.PromptTemplate.Name
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(Model.PromptTemplate.Description))
+                        {
+                            <p class="text-muted">@Model.PromptTemplate.Description</p>
+                        }
+                        
+                        <h6>Original Template:</h6>
+                        <div class="bg-light p-3 rounded" style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em;">@Model.PromptTemplate.Content</div>
+                        
+                        @if (Model.PromptTemplate.Variables.Any())
+                        {
+                            <h6 class="mt-3">Variables (@Model.PromptTemplate.Variables.Count):</h6>
+                            <ul class="list-unstyled">
+                                @foreach (var variable in Model.PromptTemplate.Variables)
+                                {
+                                    <li class="mb-1">
+                                        <code>{{@variable.Name}}</code>
+                                        @if (!string.IsNullOrEmpty(variable.Description))
+                                        {
+                                            <small class="text-muted">- @variable.Description</small>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main execution area -->
+        <div class="col-md-8">
+            <div class="p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3>Execute Prompt</h3>
+                    <a asp-page="/Index" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Collections
+                    </a>
+                </div>
+
+                <form method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    
+                    @if (Model.PromptTemplate.Variables.Any())
+                    {
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-sliders"></i> Variables
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                @foreach (var variable in Model.PromptTemplate.Variables)
+                                {
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">
+                                            {{@variable.Name}}
+                                            @if (!string.IsNullOrEmpty(variable.Description))
+                                            {
+                                                <small class="text-muted fw-normal">- @variable.Description</small>
+                                            }
+                                        </label>
+                                        
+                                        @if (variable.Type == PromptStudio.Domain.VariableType.LargeText)
+                                        {
+                                            <textarea asp-for="VariableValues[variable.Name]" class="form-control" rows="4" placeholder="Enter @variable.Name..."></textarea>
+                                        }
+                                        else
+                                        {
+                                            <input asp-for="VariableValues[variable.Name]" class="form-control" placeholder="Enter @variable.Name..." />
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    
+                    <div class="d-flex justify-content-end mb-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-play-fill"></i> Execute Prompt
+                        </button>
+                    </div>
+                </form>
+                
+                @if (!string.IsNullOrEmpty(Model.ResolvedPrompt))
+                {
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="bi bi-check-circle"></i> Resolved Prompt
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="bg-light p-4 rounded" style="white-space: pre-wrap; font-family: monospace;">@Model.ResolvedPrompt</div>
+                            
+                            <div class="mt-3 d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> Generated at @DateTime.Now.ToString("HH:mm:ss")
+                                </small>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyToClipboard()">
+                                    <i class="bi bi-clipboard"></i> Copy to Clipboard
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6>🚀 Next Steps</h6>
+                                <ul class="small text-muted">
+                                    <li>Copy the resolved prompt above</li>
+                                    <li>Paste it into your AI provider (ChatGPT, Claude, etc.)</li>
+                                    <li>Future versions will support direct AI provider integration</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard() {
+    const resolvedPrompt = `@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ResolvedPrompt))`;
+    navigator.clipboard.writeText(resolvedPrompt).then(function() {
+        // Show temporary success message
+        const button = event.target.closest('button');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-check"></i> Copied!';
+        button.classList.remove('btn-outline-primary');
+        button.classList.add('btn-success');
+        
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-primary');
+        }, 2000);
+    });
+}
+</script>

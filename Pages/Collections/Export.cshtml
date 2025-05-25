@@ -1,0 +1,99 @@
+@page "{id:int}"
+@model ExportModel
+@{
+    ViewData["Title"] = "Export Collection";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-download text-primary"></i>
+                        Export Collection
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Export "<strong>@Model.Collection.Name</strong>" to share with others or backup your prompts.
+                    </div>
+                    
+                    <div class="bg-light p-3 rounded mb-3">
+                        <h6>Collection Details</h6>
+                        <p><strong>Name:</strong> @Model.Collection.Name</p>
+                        @if (!string.IsNullOrEmpty(Model.Collection.Description))
+                        {
+                            <p><strong>Description:</strong> @Model.Collection.Description</p>
+                        }
+                        <p><strong>Prompts:</strong> @Model.Collection.PromptTemplates.Count</p>
+                        <p><strong>Total Variables:</strong> @Model.Collection.PromptTemplates.Sum(p => p.Variables.Count)</p>
+                    </div>
+                    
+                    <form method="post">
+                        <input type="hidden" asp-for="Collection.Id" />
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" asp-for="IncludeExecutionHistory" />
+                                <label class="form-check-label" asp-for="IncludeExecutionHistory">
+                                    Include execution history
+                                    <small class="text-muted d-block">Export past executions and variable values (may increase file size)</small>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Export Format</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="ExportFormat" value="json" checked />
+                                <label class="form-check-label">
+                                    JSON Format
+                                    <small class="text-muted d-block">Standard format, easily readable and portable</small>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-download"></i> Download Export
+                            </button>
+                            <a asp-page="/Index" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            @if (Model.Collection.PromptTemplates.Any())
+            {
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Prompts to Export</h6>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var prompt in Model.Collection.PromptTemplates)
+                        {
+                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                <div>
+                                    <strong>@prompt.Name</strong>
+                                    @if (!string.IsNullOrEmpty(prompt.Description))
+                                    {
+                                        <br><small class="text-muted">@prompt.Description</small>
+                                    }
+                                </div>
+                                <div class="text-end">
+                                    <small class="text-muted">@prompt.Variables.Count variables</small>
+                                    @if (prompt.Executions.Any())
+                                    {
+                                        <br><small class="text-muted">@prompt.Executions.Count executions</small>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

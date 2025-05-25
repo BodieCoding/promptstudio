@@ -1,0 +1,196 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Prompt Studio - Collections";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar like Postman -->
+        <div class="col-md-3 bg-light border-end vh-100">
+            <div class="p-3">                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Collections</h5>
+                    <div class="btn-group">
+                        <a asp-page="/Collections/Create" class="btn btn-sm btn-primary">
+                            <i class="bi bi-plus-lg"></i> New
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                            <span class="visually-hidden">Toggle Dropdown</span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" asp-page="/Collections/Import">
+                                <i class="bi bi-upload"></i> Import Collection
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                @if (Model.Collections.Any())
+                {
+                    @foreach (var collection in Model.Collections)
+                    {
+                        <div class="collection-item mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-1">
+                                    <i class="bi bi-folder2-open text-primary"></i>
+                                    @collection.Name
+                                </h6>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                        <i class="bi bi-three-dots"></i>
+                                    </button>                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" asp-page="/Collections/Edit" asp-route-id="@collection.Id">Edit</a></li>
+                                        <li><a class="dropdown-item" asp-page="/Prompts/Create" asp-route-collectionId="@collection.Id">Add Prompt</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item" asp-page="/Collections/Export" asp-route-id="@collection.Id">Export</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-danger" asp-page="/Collections/Delete" asp-route-id="@collection.Id">Delete</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            @if (collection.Description != null)
+                            {
+                                <small class="text-muted d-block mb-2">@collection.Description</small>
+                            }
+                            
+                            @if (collection.PromptTemplates.Any())
+                            {
+                                <div class="prompts-list">                                    @foreach (var prompt in collection.PromptTemplates)
+                                    {
+                                        <div class="prompt-item">
+                                            <div class="d-flex justify-content-between align-items-center p-2 rounded hover-bg-light">
+                                                <a asp-page="/Prompts/Execute" asp-route-id="@prompt.Id" 
+                                                   class="text-decoration-none flex-grow-1">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <span>
+                                                            <i class="bi bi-lightning text-warning"></i>
+                                                            @prompt.Name
+                                                        </span>
+                                                        <small class="text-muted">@prompt.Variables.Count vars</small>
+                                                    </div>
+                                                    @if (prompt.Description != null)
+                                                    {
+                                                        <small class="text-muted">@prompt.Description</small>
+                                                    }
+                                                </a>
+                                                <div class="dropdown ms-2">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                        <i class="bi bi-three-dots-vertical"></i>
+                                                    </button>                                                    <ul class="dropdown-menu">
+                                                        <li><a class="dropdown-item" asp-page="/Prompts/Execute" asp-route-id="@prompt.Id">Execute</a></li>
+                                                        <li><a class="dropdown-item" asp-page="/Prompts/Edit" asp-route-id="@prompt.Id">Edit</a></li>
+                                                        <li><a class="dropdown-item" asp-page="/Prompts/Duplicate" asp-route-id="@prompt.Id">Duplicate</a></li>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li><a class="dropdown-item text-danger" asp-page="/Prompts/Delete" asp-route-id="@prompt.Id">Delete</a></li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-center py-3">
+                                    <small class="text-muted">No prompts yet</small>
+                                    <br>
+                                    <a asp-page="/Prompts/Create" asp-route-collectionId="@collection.Id" 
+                                       class="btn btn-sm btn-outline-primary mt-2">
+                                        Add First Prompt
+                                    </a>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="text-center py-5">
+                        <i class="bi bi-folder2 text-muted" style="font-size: 3rem;"></i>
+                        <h6 class="text-muted mt-3">No Collections Yet</h6>
+                        <p class="text-muted small">Create your first collection to get started</p>
+                        <a asp-page="/Collections/Create" class="btn btn-primary">
+                            <i class="bi bi-plus-lg"></i> Create Collection
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+        
+        <!-- Main content area -->
+        <div class="col-md-9">
+            <div class="p-4">
+                <div class="text-center py-5">
+                    <div class="mb-4">
+                        <i class="bi bi-lightning-charge text-primary" style="font-size: 4rem;"></i>
+                    </div>
+                    <h2 class="text-primary mb-3">Welcome to Prompt Studio</h2>
+                    <p class="text-muted mb-4 lead">Your Postman for AI Prompts</p>
+                    
+                    <div class="row justify-content-center">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Get Started</h5>
+                                    <p class="card-text">Organize your prompts into collections, define variables, and test them with different AI providers.</p>
+                                    
+                                    <div class="row text-start">
+                                        <div class="col-md-6">
+                                            <h6><i class="bi bi-1-circle text-primary"></i> Create Collections</h6>
+                                            <p class="small text-muted">Group related prompts together like Postman collections</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6><i class="bi bi-2-circle text-primary"></i> Define Variables</h6>
+                                            <p class="small text-muted">Use {{variable}} syntax for dynamic content</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6><i class="bi bi-3-circle text-primary"></i> Test & Execute</h6>
+                                            <p class="small text-muted">Run prompts with different variable values</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6><i class="bi bi-4-circle text-primary"></i> Track History</h6>
+                                            <p class="small text-muted">See execution history and performance metrics</p>
+                                        </div>
+                                    </div>
+                                    
+                                    @if (!Model.Collections.Any())
+                                    {
+                                        <div class="mt-3">
+                                            <a asp-page="/Collections/Create" class="btn btn-primary">
+                                                <i class="bi bi-plus-lg"></i> Create Your First Collection
+                                            </a>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.hover-bg-light:hover {
+    background-color: #f8f9fa !important;
+}
+
+.collection-item {
+    border: 1px solid #e9ecef;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    background: white;
+}
+
+.prompt-item {
+    margin-left: 1rem;
+    border-left: 2px solid #e9ecef;
+    margin-bottom: 0.25rem;
+}
+
+.prompt-item:hover {
+    border-left-color: #0d6efd;
+}
+</style>

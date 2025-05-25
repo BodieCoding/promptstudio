@@ -1,0 +1,112 @@
+@page
+@model HistoryModel
+@{
+    ViewData["Title"] = "Execution History";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="bi bi-clock-history text-primary"></i>
+                    Execution History
+                </h2>
+                <a asp-page="/Index" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Collections
+                </a>
+            </div>
+            
+            @if (Model.Executions.Any())
+            {
+                <div class="row">
+                    @foreach (var execution in Model.Executions)
+                    {
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">@execution.PromptTemplate.Name</h6>
+                                        <small class="text-muted">@execution.ExecutedAt.ToString("MMM d, h:mm tt")</small>
+                                    </div>
+                                    <small class="text-muted">@execution.PromptTemplate.Collection.Name</small>
+                                </div>
+                                <div class="card-body">
+                                    @if (execution.VariableValues.Any())
+                                    {
+                                        <h6>Variables:</h6>
+                                        <div class="mb-3">
+                                            @foreach (var variable in execution.VariableValues)
+                                            {
+                                                <div class="mb-2">
+                                                    <strong>{{@variable.Key}}:</strong>
+                                                    <div class="bg-light p-2 rounded">
+                                                        <small>@variable.Value</small>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                      @if (!string.IsNullOrEmpty(execution.ResolvedPrompt))
+                                    {
+                                        <h6>Resolved Prompt:</h6>
+                                        <div class="bg-light p-2 rounded mb-3">
+                                            <pre class="mb-0" style="white-space: pre-wrap; font-size: 0.85em;">@execution.ResolvedPrompt</pre>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="card-footer">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">@execution.ExecutedAt.ToString("MMMM d, yyyy 'at' h:mm:ss tt")</small>
+                                        <a asp-page="/Prompts/Execute" asp-route-id="@execution.PromptTemplateId" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-arrow-repeat"></i> Run Again
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                
+                @if (Model.TotalPages > 1)
+                {
+                    <nav aria-label="Execution history pagination">
+                        <ul class="pagination justify-content-center">
+                            @if (Model.CurrentPage > 1)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" asp-page="/Executions/History" asp-route-page="@(Model.CurrentPage - 1)">Previous</a>
+                                </li>
+                            }
+                            
+                            @for (int i = Math.Max(1, Model.CurrentPage - 2); i <= Math.Min(Model.TotalPages, Model.CurrentPage + 2); i++)
+                            {
+                                <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                                    <a class="page-link" asp-page="/Executions/History" asp-route-page="@i">@i</a>
+                                </li>
+                            }
+                            
+                            @if (Model.CurrentPage < Model.TotalPages)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" asp-page="/Executions/History" asp-route-page="@(Model.CurrentPage + 1)">Next</a>
+                                </li>
+                            }
+                        </ul>
+                    </nav>
+                }
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-clock-history text-muted" style="font-size: 4rem;"></i>
+                    <h4 class="text-muted mt-3">No Execution History</h4>
+                    <p class="text-muted">Execute some prompts to see their history here.</p>
+                    <a asp-page="/Index" class="btn btn-primary">
+                        <i class="bi bi-arrow-left"></i> Go to Collections
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>

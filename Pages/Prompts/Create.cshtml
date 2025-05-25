@@ -1,0 +1,92 @@
+@page
+@model PromptStudio.Pages.Prompts.CreateModel
+@{
+    ViewData["Title"] = "Create Prompt";
+}
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-lightning-charge text-warning"></i>
+                        Create New Prompt
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="CollectionId" class="form-label">Collection</label>
+                            <select asp-for="CollectionId" asp-items="Model.Collections" class="form-select">
+                                <option value="">Choose a collection...</option>
+                            </select>
+                            <span asp-validation-for="CollectionId" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="PromptTemplate.Name" class="form-label">Prompt Name</label>
+                            <input asp-for="PromptTemplate.Name" class="form-control" placeholder="e.g., Code Review, Blog Post Writer, Email Generator" />
+                            <span asp-validation-for="PromptTemplate.Name" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="PromptTemplate.Description" class="form-label">Description (Optional)</label>
+                            <input asp-for="PromptTemplate.Description" class="form-control" placeholder="Brief description of what this prompt does..." />
+                            <span asp-validation-for="PromptTemplate.Description" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="PromptTemplate.Content" class="form-label">Prompt Content</label>
+                            <textarea asp-for="PromptTemplate.Content" class="form-control" rows="10" 
+                                      placeholder="Write your prompt here. Use {{variable_name}} for dynamic content.&#10;&#10;Example:&#10;Please review the following {{language}} code:&#10;&#10;{{code}}&#10;&#10;Focus on {{review_type}} and provide specific suggestions."></textarea>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i>
+                                Use <code>{{variable_name}}</code> syntax for variables. They'll be automatically detected and added as fields.
+                            </div>
+                            <span asp-validation-for="PromptTemplate.Content" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a asp-page="/Index" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Create Prompt
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">💡 Variable Tips</h6>
+                        <ul class="small text-muted">
+                            <li>Variables use double curly braces: <code>{{variable_name}}</code></li>
+                            <li>They'll appear as input fields when executing the prompt</li>
+                            <li>Good variable names: <code>{{language}}</code>, <code>{{code}}</code>, <code>{{topic}}</code></li>
+                            <li>Variables are automatically extracted and can be edited later</li>
+                        </ul>
+                        
+                        <h6 class="card-title mt-3">📝 Example Prompts</h6>
+                        <div class="small">
+                            <strong>Code Review:</strong><br>
+                            <code>Review this {{language}} code for {{focus_area}}:<br><br>{{code}}</code>
+                            <br><br>
+                            <strong>Content Writing:</strong><br>
+                            <code>Write a {{tone}} {{content_type}} about {{topic}} for {{audience}}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

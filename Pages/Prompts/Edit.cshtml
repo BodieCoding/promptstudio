@@ -1,0 +1,121 @@
+@page "{id:int}"
+@model EditModel
+@{
+    ViewData["Title"] = "Edit Prompt";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-pencil-square text-primary"></i>
+                        Edit Prompt
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        <input type="hidden" asp-for="PromptTemplate.Id" />
+                        <input type="hidden" asp-for="PromptTemplate.CollectionId" />
+                        
+                        <div class="mb-3">
+                            <label asp-for="PromptTemplate.Name" class="form-label">Name</label>
+                            <input asp-for="PromptTemplate.Name" class="form-control" placeholder="e.g., Code Review Request" />
+                            <span asp-validation-for="PromptTemplate.Name" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="PromptTemplate.Description" class="form-label">Description</label>
+                            <textarea asp-for="PromptTemplate.Description" class="form-control" rows="2" 
+                                      placeholder="Brief description of this prompt..."></textarea>
+                            <span asp-validation-for="PromptTemplate.Description" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="PromptTemplate.Content" class="form-label">
+                                Prompt Content
+                                <small class="text-muted">(Use {{variable}} syntax for variables)</small>
+                            </label>
+                            <textarea asp-for="PromptTemplate.Content" class="form-control" rows="10" 
+                                      placeholder="Enter your prompt template here. Use {{variable}} for dynamic content."></textarea>
+                            <span asp-validation-for="PromptTemplate.Content" class="text-danger"></span>
+                            <div class="form-text">
+                                Variables will be automatically detected from your content using {{variable}} syntax.
+                            </div>
+                        </div>
+                        
+                        @if (Model.DetectedVariables.Any())
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Detected Variables</label>
+                                <div class="detected-variables">
+                                    @foreach (var variable in Model.DetectedVariables)
+                                    {
+                                        <span class="badge bg-secondary me-1 mb-1">{{@variable}}</span>
+                                    }
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    These variables will be saved when you update the prompt.
+                                </small>
+                            </div>
+                        }
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Update Prompt
+                            </button>
+                            <a asp-page="/Prompts/Execute" asp-route-id="@Model.PromptTemplate.Id" class="btn btn-success">
+                                <i class="bi bi-play"></i> Test Prompt
+                            </a>
+                            <a asp-page="/Index" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            @if (Model.PromptTemplate.Executions.Any())
+            {
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Recent Executions</h6>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var execution in Model.PromptTemplate.Executions.OrderByDescending(e => e.ExecutedAt).Take(5))
+                        {                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                <div>
+                                    <small class="text-muted">@execution.ExecutedAt.ToString("MMM d, yyyy 'at' h:mm tt")</small>
+                                </div>
+                                <small class="text-muted">@execution.ExecutedAt.ToString("h:mm tt")</small>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const contentTextarea = document.querySelector('textarea[name="PromptTemplate.Content"]');
+    const variablesContainer = document.querySelector('.detected-variables');
+    
+    if (contentTextarea && variablesContainer) {
+        contentTextarea.addEventListener('input', function() {
+            // Real-time variable detection (simplified)
+            const content = this.value;
+            const variables = [...content.matchAll(/\{\{(\w+)\}\}/g)].map(match => match[1]);
+            const uniqueVariables = [...new Set(variables)];
+            
+            variablesContainer.innerHTML = '';
+            uniqueVariables.forEach(variable => {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-secondary me-1 mb-1';
+                badge.textContent = `{{${variable}}}`;
+                variablesContainer.appendChild(badge);
+            });
+        });
+    }
+});
+</script>

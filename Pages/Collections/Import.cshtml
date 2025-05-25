@@ -1,0 +1,95 @@
+@page
+@model ImportModel
+@{
+    ViewData["Title"] = "Import Collection";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-upload text-primary"></i>
+                        Import Collection
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Import a previously exported collection or share collections from other PromptStudio instances.
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            @Model.ErrorMessage
+                        </div>
+                    }
+                    
+                    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+                    {
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i>
+                            @Model.SuccessMessage
+                        </div>
+                    }
+                    
+                    <form method="post" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label asp-for="ImportFile" class="form-label">Select Export File</label>
+                            <input asp-for="ImportFile" class="form-control" type="file" accept=".json" />
+                            <span asp-validation-for="ImportFile" class="text-danger"></span>
+                            <div class="form-text">
+                                Choose a JSON file exported from PromptStudio (.json format only)
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" asp-for="ImportExecutionHistory" />
+                                <label class="form-check-label" asp-for="ImportExecutionHistory">
+                                    Import execution history
+                                    <small class="text-muted d-block">Include past executions if available in the export file</small>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" asp-for="OverwriteExisting" />
+                                <label class="form-check-label" asp-for="OverwriteExisting">
+                                    Overwrite if collection exists
+                                    <small class="text-muted d-block">Replace existing collection with same name, otherwise create a new one with suffix</small>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-upload"></i> Import Collection
+                            </button>
+                            <a asp-page="/Index" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Import Guidelines</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li>Only JSON files exported from PromptStudio are supported</li>
+                        <li>Collection names must be unique - duplicates will get a suffix</li>
+                        <li>Variables will be automatically recreated from prompt content</li>
+                        <li>Execution history is optional and will preserve timestamps</li>
+                        <li>Large files with extensive history may take longer to process</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

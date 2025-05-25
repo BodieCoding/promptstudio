@@ -1,0 +1,87 @@
+@page "{id:int}"
+@model DuplicateModel
+@{
+    ViewData["Title"] = "Duplicate Prompt";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-files text-primary"></i>
+                        Duplicate Prompt
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Creating a copy of "<strong>@Model.OriginalPrompt.Name</strong>" from the <strong>@Model.OriginalPrompt.Collection.Name</strong> collection.
+                    </div>
+                    
+                    <form method="post">
+                        <input type="hidden" asp-for="OriginalPromptId" />
+                        
+                        <div class="mb-3">
+                            <label asp-for="NewPrompt.CollectionId" class="form-label">Target Collection</label>
+                            <select asp-for="NewPrompt.CollectionId" class="form-select">
+                                @foreach (var collection in Model.Collections)
+                                {
+                                    <option value="@collection.Id" selected="@(collection.Id == Model.OriginalPrompt.CollectionId)">
+                                        @collection.Name
+                                    </option>
+                                }
+                            </select>
+                            <span asp-validation-for="NewPrompt.CollectionId" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="NewPrompt.Name" class="form-label">Name</label>
+                            <input asp-for="NewPrompt.Name" class="form-control" />
+                            <span asp-validation-for="NewPrompt.Name" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="NewPrompt.Description" class="form-label">Description</label>
+                            <textarea asp-for="NewPrompt.Description" class="form-control" rows="2"></textarea>
+                            <span asp-validation-for="NewPrompt.Description" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="NewPrompt.Content" class="form-label">
+                                Prompt Content
+                                <small class="text-muted">(You can modify the content before duplicating)</small>
+                            </label>
+                            <textarea asp-for="NewPrompt.Content" class="form-control" rows="10"></textarea>
+                            <span asp-validation-for="NewPrompt.Content" class="text-danger"></span>
+                        </div>
+                        
+                        @if (Model.DetectedVariables.Any())
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Variables in this prompt</label>
+                                <div class="detected-variables">
+                                    @foreach (var variable in Model.DetectedVariables)
+                                    {
+                                        <span class="badge bg-secondary me-1 mb-1">{{@variable}}</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-files"></i> Create Duplicate
+                            </button>
+                            <a asp-page="/Prompts/Execute" asp-route-id="@Model.OriginalPromptId" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to Original
+                            </a>
+                            <a asp-page="/Index" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

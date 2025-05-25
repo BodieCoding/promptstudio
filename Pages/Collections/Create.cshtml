@@ -1,0 +1,63 @@
+@page
+@model PromptStudio.Pages.Collections.CreateModel
+@{
+    ViewData["Title"] = "Create Collection";
+}
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-folder-plus text-primary"></i>
+                        Create New Collection
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="Collection.Name" class="form-label">Collection Name</label>
+                            <input asp-for="Collection.Name" class="form-control" placeholder="e.g., Content Writing, Code Review, Data Analysis" />
+                            <span asp-validation-for="Collection.Name" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="Collection.Description" class="form-label">Description (Optional)</label>
+                            <textarea asp-for="Collection.Description" class="form-control" rows="3" placeholder="Describe what this collection is for..."></textarea>
+                            <span asp-validation-for="Collection.Description" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a asp-page="/Index" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Create Collection
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">💡 Tips</h6>
+                        <ul class="small text-muted">
+                            <li>Collections help you organize related prompts together</li>
+                            <li>Think of them like folders in Postman</li>
+                            <li>Good examples: "SEO Content", "Code Reviews", "Customer Support"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}
