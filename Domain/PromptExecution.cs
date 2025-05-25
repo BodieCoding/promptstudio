@@ -4,7 +4,7 @@ namespace PromptStudio.Domain;
 
 /// <summary>
 /// Represents an execution of a prompt template with specific variable values
-/// Like a test run in Postman
+/// Like a test execution record in professional testing tools
 /// </summary>
 public class PromptExecution
 {

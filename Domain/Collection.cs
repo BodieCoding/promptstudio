@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace PromptStudio.Domain;
 
 /// <summary>
-/// A Collection is like a Postman Collection - it groups related prompts together
+/// A Collection is like a project folder - it groups related prompts together
 /// </summary>
 public class Collection
 {

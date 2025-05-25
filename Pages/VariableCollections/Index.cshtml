@@ -1,0 +1,153 @@
+@page "/prompts/{promptId:int}/variable-collections"
+@model PromptStudio.Pages.VariableCollections.IndexModel
+@{
+    ViewData["Title"] = "Variable Collections";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>Variable Collections</h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="/">Home</a></li>
+                            <li class="breadcrumb-item"><a href="/">Collections</a></li>
+                            <li class="breadcrumb-item"><a href="/prompts/@Model.PromptTemplate.Id/execute">@Model.PromptTemplate.Name</a></li>
+                            <li class="breadcrumb-item active">Variable Collections</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="btn-group">
+                    <a href="/prompts/@Model.PromptTemplate.Id/variable-collections/create" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> New Collection
+                    </a>
+                    <a href="/prompts/@Model.PromptTemplate.Id/variable-collections/download-template" class="btn btn-outline-secondary">
+                        <i class="bi bi-download"></i> Download CSV Template
+                    </a>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.Message))
+            {
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    @Model.Message
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @Model.ErrorMessage
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-collection"></i> Collections for "@Model.PromptTemplate.Name"
+                    </h5>
+                    <small class="text-muted">
+                        Variables detected: @string.Join(", ", Model.VariableNames.Select(v => $"{{{{ {v} }}}}"))
+                    </small>
+                </div>
+                <div class="card-body">
+                    @if (Model.VariableCollections.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Variable Sets</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var collection in Model.VariableCollections)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <strong>@collection.Name</strong>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">@collection.Description</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">@collection.VariableSets.Count sets</span>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">@collection.CreatedAt.ToString("MMM dd, yyyy")</small>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="/prompts/@Model.PromptTemplate.Id/variable-collections/@collection.Id/execute" 
+                                                       class="btn btn-success" title="Batch Execute">
+                                                        <i class="bi bi-play-fill"></i>
+                                                    </a>
+                                                    <a href="/prompts/@Model.PromptTemplate.Id/variable-collections/@collection.Id/edit" 
+                                                       class="btn btn-outline-primary" title="Edit">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    <a href="/prompts/@Model.PromptTemplate.Id/variable-collections/@collection.Id/export" 
+                                                       class="btn btn-outline-secondary" title="Export CSV">
+                                                        <i class="bi bi-download"></i>
+                                                    </a>
+                                                    <a href="/prompts/@Model.PromptTemplate.Id/variable-collections/@collection.Id/delete" 
+                                                       class="btn btn-outline-danger" title="Delete">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-collection display-4 text-muted"></i>
+                            <h4 class="mt-3">No Variable Collections</h4>
+                            <p class="text-muted">Create your first variable collection to batch test this prompt with multiple data sets.</p>
+                            <a href="/prompts/@Model.PromptTemplate.Id/variable-collections/create" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Create Variable Collection
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Quick Help -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="bi bi-question-circle"></i> How it works
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6><i class="bi bi-1-circle text-primary"></i> Download Template</h6>
+                            <p class="small text-muted">Get a CSV template with your prompt's variables as columns.</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6><i class="bi bi-2-circle text-primary"></i> Fill with Data</h6>
+                            <p class="small text-muted">Add rows with different values for each variable set you want to test.</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6><i class="bi bi-3-circle text-primary"></i> Batch Execute</h6>
+                            <p class="small text-muted">Upload your CSV and execute the prompt against all variable sets at once.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

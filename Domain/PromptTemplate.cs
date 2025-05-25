@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace PromptStudio.Domain;
 
 /// <summary>
-/// A PromptTemplate is like a Postman Request - it's a reusable prompt with variables
+/// A PromptTemplate is like an API request template - it's a reusable prompt with variables
 /// </summary>
 public class PromptTemplate
 {
@@ -24,9 +24,9 @@ public class PromptTemplate
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-    
-    // Navigation properties
+      // Navigation properties
     public virtual Collection Collection { get; set; } = null!;
     public virtual ICollection<PromptVariable> Variables { get; set; } = new List<PromptVariable>();
     public virtual ICollection<PromptExecution> Executions { get; set; } = new List<PromptExecution>();
+    public virtual ICollection<VariableCollection> VariableCollections { get; set; } = new List<VariableCollection>();
 }

@@ -1,0 +1,67 @@
+@page "/test-csv"
+@model PromptStudio.Pages.TestCsvModel
+@{
+    ViewData["Title"] = "Test CSV Parsing";
+}
+
+<div class="container mt-4">
+    <h2>Test CSV Parsing</h2>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <h4>CSV Content</h4>
+            <form method="post">
+                <div class="mb-3">
+                    <label for="promptId" class="form-label">Prompt ID</label>
+                    <input type="number" class="form-control" id="promptId" name="promptId" value="1" />
+                </div>
+                <div class="mb-3">
+                    <label for="csvContent" class="form-label">CSV Content</label>
+                    <textarea class="form-control" id="csvContent" name="csvContent" rows="10" placeholder="Paste your CSV content here...">language,code
+javascript,"function greet(name) {
+    return 'Hello ' + name;
+}"
+python,"def greet(name):
+    return f""Hello {name}"""</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Parse CSV</button>
+            </form>
+        </div>
+        
+        <div class="col-md-6">
+            <h4>Parsing Results</h4>
+            @if (Model.ParseResult != null)
+            {
+                @if (Model.ParseResult.Success)
+                {
+                    <div class="alert alert-success">
+                        <strong>Success!</strong> Parsed @Model.ParseResult.VariableSets.Count variable sets.
+                    </div>
+                    
+                    @foreach (var (variableSet, index) in Model.ParseResult.VariableSets.Select((vs, i) => (vs, i)))
+                    {
+                        <div class="card mb-2">
+                            <div class="card-header">
+                                <strong>Variable Set @(index + 1)</strong>
+                            </div>
+                            <div class="card-body">
+                                @foreach (var variable in variableSet)
+                                {
+                                    <div class="mb-2">
+                                        <strong>@variable.Key:</strong> @variable.Value
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-danger">
+                        <strong>Error:</strong> @Model.ParseResult.Error
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>

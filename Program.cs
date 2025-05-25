@@ -2,42 +2,52 @@ using Microsoft.EntityFrameworkCore;
 using PromptStudio.Data;
 using PromptStudio.Services;
 
+// Create the web application builder
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddRazorPages();
+// Configure services
+{
+    // Add MVC, API Controllers, and Razor Pages
+    builder.Services.AddControllers();
+    builder.Services.AddRazorPages();
 
-// Add Entity Framework
-builder.Services.AddDbContext<PromptStudioDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    // Configure Entity Framework with SQL Server
+    builder.Services.AddDbContext<PromptStudioDbContext>(options =>
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add application services
-builder.Services.AddScoped<IPromptService, PromptService>();
+    // Register application services
+    builder.Services.AddScoped<IPromptService, PromptService>();
+}
 
+// Build the application
 var app = builder.Build();
 
-// Ensure database is created and migrated
+// Ensure database exists and is up to date
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<PromptStudioDbContext>();
     context.Database.EnsureCreated();
 }
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
+// Configure the HTTP pipeline
 {
-    app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseExceptionHandler("/Error");
+        // The default HSTS value is 30 days.
+        app.UseHsts();
+    }
+
+    // Enable HTTPS redirection and static files
+    app.UseHttpsRedirection();
+    app.UseStaticFiles();    // Enable routing and authorization
+    app.UseRouting();
+    app.UseAuthorization();
+
+    // Map API Controllers and Razor Pages
+    app.MapControllers();
+    app.MapRazorPages();
 }
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-
-app.UseRouting();
-
-app.UseAuthorization();
-
-app.MapRazorPages();
-
+// Start the application
 app.Run();

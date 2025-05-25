@@ -6,7 +6,8 @@ using PromptStudio.Domain;
 using PromptStudio.Services;
 
 namespace PromptStudio.Pages.Prompts
-{    public class EditModel : PageModel
+{
+    public class EditModel : PageModel
     {
         private readonly PromptStudioDbContext _context;
         private readonly IPromptService _promptService;
@@ -66,12 +67,12 @@ namespace PromptStudio.Pages.Prompts
 
             // Update variables
             var newVariables = _promptService.ExtractVariableNames(PromptTemplate.Content ?? "");
-            
+
             // Remove variables that no longer exist
             var variablesToRemove = existingPrompt.Variables
                 .Where(v => !newVariables.Contains(v.Name))
                 .ToList();
-            
+
             foreach (var variable in variablesToRemove)
             {
                 _context.PromptVariables.Remove(variable);

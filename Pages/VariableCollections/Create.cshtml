@@ -1,0 +1,107 @@
+@page "/prompts/{promptId:int}/variable-collections/create"
+@model PromptStudio.Pages.VariableCollections.CreateModel
+@{
+    ViewData["Title"] = "Create Variable Collection";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="mb-4">
+                <h2>Create Variable Collection</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Home</a></li>
+                        <li class="breadcrumb-item"><a href="/prompts/@Model.PromptTemplate.Id/variable-collections">Variable Collections</a></li>
+                        <li class="breadcrumb-item active">Create</li>
+                    </ol>
+                </nav>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-plus-circle"></i> New Variable Collection for "@Model.PromptTemplate.Name"
+                    </h5>
+                    <small class="text-muted">
+                        Variables: @string.Join(", ", Model.VariableNames.Select(v => $"{{{{ {v} }}}}"))
+                    </small>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        <input type="hidden" asp-for="PromptId" />
+                        
+                        <div class="mb-3">
+                            <label asp-for="Name" class="form-label">Name *</label>
+                            <input asp-for="Name" class="form-control" placeholder="e.g., Test Data Set 1" />
+                            <span asp-validation-for="Name" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Description" class="form-label">Description</label>
+                            <textarea asp-for="Description" class="form-control" rows="2" 
+                                      placeholder="Optional description of this variable collection"></textarea>
+                            <span asp-validation-for="Description" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="CsvFile" class="form-label">Upload CSV File *</label>
+                            <input asp-for="CsvFile" type="file" class="form-control" accept=".csv" />
+                            <div class="form-text">
+                                Upload a CSV file with your variable data. 
+                                <a href="/prompts/@Model.PromptTemplate.Id/variable-collections/download-template" target="_blank">
+                                    <i class="bi bi-download"></i> Download template
+                                </a>
+                            </div>
+                            <span asp-validation-for="CsvFile" class="text-danger"></span>
+                        </div>
+
+                        @if (ViewData.ModelState.ContainsKey("CsvData"))
+                        {
+                            <div class="alert alert-danger">
+                                @ViewData.ModelState["CsvData"]?.Errors.FirstOrDefault()?.ErrorMessage
+                            </div>
+                        }
+
+                        <div class="d-flex justify-content-between">
+                            <a href="/prompts/@Model.PromptTemplate.Id/variable-collections" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Create Collection
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Help Section -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> CSV Format Requirements</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Required Columns:</h6>
+                            <ul class="list-unstyled">
+                                @foreach (var variable in Model.VariableNames)
+                                {
+                                    <li><code>@variable</code></li>
+                                }
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Example CSV:</h6>
+                            <pre class="bg-light p-2 small">@Model.SampleCsv</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
