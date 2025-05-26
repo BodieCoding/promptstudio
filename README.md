@@ -1,4 +1,4 @@
-![PromptStudio Logo](wwwroot/imgages/logo.png)
+![PromptStudio Logo](wwwroot/images/logo.png)
 
 > **Professional AI Prompt Management** - Organize, test, and manage your AI prompts with ease.
 
