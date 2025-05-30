@@ -235,6 +235,32 @@ typescript,"function greet(name: string): string { return `Hello ${name}`; }"
 3. **Upload & Execute** → Batch process all variable sets
 4. **Export Results** → Download comprehensive results with resolved prompts
 
+## 📸 Screenshots
+
+### Main Dashboard
+![PromptStudio Dashboard](wwwroot/images/Index%202025-05-30%20072754.png)
+*Clean, modern dashboard showing collections overview with prompt counts and recent activity*
+
+### Creating New Prompts
+![New Prompt Creation](wwwroot/images/NewPrompt%202025-05-30%20073027.png)
+*Intuitive prompt creation interface with variable auto-detection and syntax highlighting*
+
+### Prompt Execution
+![Prompt Execution](wwwroot/images/Execute%202025-05-30%20072827.png)
+*Execute prompts with variable substitution and see resolved output in real-time*
+
+### Variable Collections Management
+![Variable Collections](wwwroot/images/VariableCollections.png)
+*Manage multiple variable sets for batch testing and data-driven prompt execution*
+
+### Batch Variable Collection
+![Batch Processing](wwwroot/images/BatchVariableCollection%202025-05-30.png)
+*Advanced batch processing interface for executing prompts against multiple variable collections simultaneously*
+
+### CSV Import for Variable Collections
+![CSV Import](wwwroot/images/ImportCollection%202025-05-30%20072654.png)
+*Import CSV data to create variable collections - Excel/CSV workflow integration for enterprise-scale testing*
+
 ## 🔥 Variable Collections - Batch Processing Power
 
 **Transform single prompt testing into enterprise-scale batch processing!**
