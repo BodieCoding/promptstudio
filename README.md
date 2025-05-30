@@ -261,6 +261,10 @@ typescript,"function greet(name: string): string { return `Hello ${name}`; }"
 ![CSV Import](wwwroot/images/ImportCollection%202025-05-30%20072654.png)
 *Import CSV data to create variable collections - Excel/CSV workflow integration for enterprise-scale testing*
 
+### MCP Integration with AI Assistants
+![MCP Tools](wwwroot/images/MCPToolsAdded%202025-05-30%20080607.png)
+*Model Context Protocol integration enables AI assistants like GitHub Copilot and Claude Desktop to access PromptStudio functionality through natural language commands*
+
 ## 🔥 Variable Collections - Batch Processing Power
 
 **Transform single prompt testing into enterprise-scale batch processing!**
