@@ -10,9 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 {
     // Add MVC, API Controllers, and Razor Pages
     builder.Services.AddControllers();
-    builder.Services.AddRazorPages();      // Configure Entity Framework with SQLite
+    builder.Services.AddRazorPages();    // Configure Entity Framework with SQL Server
     builder.Services.AddDbContext<PromptStudioDbContext>(options =>
-        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
     // Register application services
     builder.Services.AddScoped<IPromptService, PromptStudio.Core.Services.PromptService>();
