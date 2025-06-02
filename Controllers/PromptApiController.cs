@@ -341,31 +341,46 @@ public class PromptApiController(IPromptService promptService) : ControllerBase
         {
             return StatusCode(StatusCodes.Status500InternalServerError, $"Error executing batch: {ex.Message}");
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Generate a CSV template for a prompt template
     /// </summary>
     /// <param name="templateId">Prompt template ID</param>
-    /// <returns>CSV template content</returns>
+    /// <returns>CSV file containing the variable template</returns>
+    /// <response code="200">Returns the CSV template file</response>
+    /// <response code="404">If the prompt template is not found</response>
+    /// <response code="400">If there's an error generating the template</response>
     [HttpGet("prompt-templates/{templateId}/csv-template")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerateCsvTemplate(int templateId)
     {
         try
         {
             var template = await promptService.GetPromptTemplateByIdAsync(templateId);
-
             if (template == null)
             {
                 return NotFound($"Prompt template with ID {templateId} not found");
             }
 
-            var csvTemplate = promptService.GenerateVariableCsvTemplate(template);
-            return Ok(new { CsvTemplate = csvTemplate });
+            var csvContent = promptService.GenerateVariableCsvTemplate(template);
+
+            var cleanName = template.Name?.Replace(" ", "_") ?? "untitled";
+            foreach (var invalidChar in Path.GetInvalidFileNameChars())
+            {
+                cleanName = cleanName.Replace(invalidChar, '_');
+            }
+            var fileName = $"{cleanName}_variables.csv";
+
+            return File(
+                System.Text.Encoding.UTF8.GetBytes(csvContent),
+                "text/csv",
+                fileName
+            );
         }
         catch (Exception ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, $"Error generating CSV template: {ex.Message}");
+            return BadRequest($"Error generating CSV template: {ex.Message}");
         }
     }
 
@@ -539,9 +554,7 @@ public class CreateCollectionRequest
     /// <summary>
     /// Collection name
     /// </summary>
-    public string Name { get; set; } = string.Empty;
-
-    /// <summary>
+    public string Name { get; set; } = string.Empty;    /// <summary>
     /// Optional description
     /// </summary>
     public string? Description { get; set; }
