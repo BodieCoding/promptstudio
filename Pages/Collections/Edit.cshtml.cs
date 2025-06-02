@@ -1,36 +1,33 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Domain;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 using System.ComponentModel.DataAnnotations;
 
 namespace PromptStudio.Pages.Collections
 {
-    public class EditModel : PageModel
+    public class EditModel(IPromptService promptService) : PageModel
     {
-        private readonly PromptStudioDbContext _context;
-
-        public EditModel(PromptStudioDbContext context)
-        {
-            _context = context;
-        }
-
         [BindProperty]
-        public Collection Collection { get; set; } = default!;
+        public CollectionViewModel Collection { get; set; } = default!;
+
+        public Collection? OriginalCollection { get; set; }
 
         public async Task<IActionResult> OnGetAsync(int id)
         {
-            var collection = await _context.Collections
-                .Include(c => c.PromptTemplates)
-                .FirstOrDefaultAsync(m => m.Id == id);
-
-            if (collection == null)
-            {
+            var collection = await promptService.GetCollectionByIdAsync(id);
+            if (collection == null) 
                 return NotFound();
-            }
 
-            Collection = collection;
+            OriginalCollection = collection;
+
+            Collection = new CollectionViewModel
+            {
+                Id = collection.Id,
+                Name = collection.Name,
+                Description = collection.Description,
+                PromptTemplates = collection.PromptTemplates?.ToList() ?? []
+            };
             return Page();
         }
 
@@ -38,43 +35,64 @@ namespace PromptStudio.Pages.Collections
         {
             if (!ModelState.IsValid)
             {
-                // Reload the prompts for display
-                var existingCollection = await _context.Collections
-                    .Include(c => c.PromptTemplates)
-                    .FirstOrDefaultAsync(c => c.Id == Collection.Id);
-                
-                if (existingCollection != null)
+                if (Collection?.Id > 0)
                 {
-                    Collection.PromptTemplates = existingCollection.PromptTemplates;
+                    OriginalCollection = await promptService.GetCollectionByIdAsync(Collection.Id);
                 }
-                
                 return Page();
             }
 
-            _context.Attach(Collection).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                var updatedCollection = await promptService.UpdateCollectionAsync(
+                    Collection.Id,
+                    Collection.Name,
+                    Collection.Description);
+
+                if (updatedCollection == null)
+                {
+                    ModelState.AddModelError(string.Empty, "Could not update the collection. It may have been deleted or a concurrency issue occurred.");
+                    if (Collection?.Id > 0)
+                    {
+                        OriginalCollection = await promptService.GetCollectionByIdAsync(Collection.Id);
+                    }
+                    return Page();
+                }
             }
-            catch (DbUpdateConcurrencyException)
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
             {
-                if (!CollectionExists(Collection.Id))
+                ModelState.AddModelError(string.Empty, "The collection was modified by another user. Please reload and try again.");
+                if (Collection?.Id > 0)
                 {
-                    return NotFound();
+                    OriginalCollection = await promptService.GetCollectionByIdAsync(Collection.Id);
                 }
-                else
+                return Page();
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError(string.Empty, $"An unexpected error occurred: {ex.Message}");
+                if (Collection?.Id > 0)
                 {
-                    throw;
+                    OriginalCollection = await promptService.GetCollectionByIdAsync(Collection.Id);
                 }
+                return Page();
             }
 
-            return RedirectToPage("/Index");
+            return RedirectToPage("/Index", new { message = $"Collection '{Collection.Name}' updated successfully." });
         }
+    }
 
-        private bool CollectionExists(int id)
-        {
-            return _context.Collections.Any(e => e.Id == id);
-        }
+    public class CollectionViewModel
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        public string Name { get; set; } = string.Empty;
+
+        [StringLength(500)]
+        public string? Description { get; set; }
+
+        public List<PromptTemplate> PromptTemplates { get; set; } = [];
     }
 }

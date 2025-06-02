@@ -95,7 +95,7 @@
                                             }
                                         </label>
                                         
-                                        @if (variable.Type == PromptStudio.Domain.VariableType.LargeText)
+                                        @if (variable.Type == PromptStudio.Core.Domain.VariableType.LargeText)
                                         {
                                             <textarea asp-for="VariableValues[variable.Name]" class="form-control" rows="4" placeholder="Enter @variable.Name..."></textarea>
                                         }

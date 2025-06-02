@@ -1,43 +1,40 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Domain;
-using PromptStudio.Services;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
+using System.ComponentModel.DataAnnotations;
 
 namespace PromptStudio.Pages.Prompts
 {
-    public class EditModel : PageModel
+    public class EditModel(IPromptService promptService) : PageModel
     {
-        private readonly PromptStudioDbContext _context;
-        private readonly IPromptService _promptService;
-
-        public EditModel(PromptStudioDbContext context, IPromptService promptService)
-        {
-            _context = context;
-            _promptService = promptService;
-        }
-
         [BindProperty]
-        public PromptTemplate PromptTemplate { get; set; } = default!;
+        public PromptTemplateViewModel PromptTemplate { get; set; } = default!;
 
-        public List<string> DetectedVariables { get; set; } = new();
+        public List<string> DetectedVariables { get; set; } = [];
+        public SelectList? Collections { get; set; }
 
         public async Task<IActionResult> OnGetAsync(int id)
         {
-            var promptTemplate = await _context.PromptTemplates
-                .Include(p => p.Collection)
-                .Include(p => p.Variables)
-                .Include(p => p.Executions)
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var promptTemplate = await promptService.GetPromptTemplateByIdAsync(id);
 
             if (promptTemplate == null)
             {
                 return NotFound();
             }
 
-            PromptTemplate = promptTemplate;
-            DetectedVariables = _promptService.ExtractVariableNames(PromptTemplate.Content);
+            PromptTemplate = new PromptTemplateViewModel
+            {
+                Id = promptTemplate.Id,
+                Name = promptTemplate.Name,
+                Description = promptTemplate.Description,
+                Content = promptTemplate.Content,
+                CollectionId = promptTemplate.CollectionId,
+                Executions = [.. promptTemplate.Executions]
+            };
+            await LoadCollectionsAsync(promptTemplate.CollectionId);
+            DetectedVariables = promptService.ExtractVariableNames(PromptTemplate.Content ?? "");
             return Page();
         }
 
@@ -45,76 +42,73 @@ namespace PromptStudio.Pages.Prompts
         {
             if (!ModelState.IsValid)
             {
-                DetectedVariables = _promptService.ExtractVariableNames(PromptTemplate.Content ?? "");
+                DetectedVariables = promptService.ExtractVariableNames(PromptTemplate.Content ?? "");
+                await LoadCollectionsAsync(PromptTemplate.CollectionId);
                 return Page();
-            }
-
-            // Get the existing prompt template to update
-            var existingPrompt = await _context.PromptTemplates
-                .Include(p => p.Variables)
-                .FirstOrDefaultAsync(p => p.Id == PromptTemplate.Id);
-
-            if (existingPrompt == null)
-            {
-                return NotFound();
-            }
-
-            // Update the properties
-            existingPrompt.Name = PromptTemplate.Name;
-            existingPrompt.Description = PromptTemplate.Description;
-            existingPrompt.Content = PromptTemplate.Content;
-            existingPrompt.UpdatedAt = DateTime.UtcNow;
-
-            // Update variables
-            var newVariables = _promptService.ExtractVariableNames(PromptTemplate.Content ?? "");
-
-            // Remove variables that no longer exist
-            var variablesToRemove = existingPrompt.Variables
-                .Where(v => !newVariables.Contains(v.Name))
-                .ToList();
-
-            foreach (var variable in variablesToRemove)
-            {
-                _context.PromptVariables.Remove(variable);
-            }
-
-            // Add new variables
-            var existingVariableNames = existingPrompt.Variables.Select(v => v.Name);
-            var variablesToAdd = newVariables
-                .Where(name => !existingVariableNames.Contains(name))
-                .Select(name => new PromptVariable
-                {
-                    Name = name,
-                    PromptTemplateId = existingPrompt.Id
-                });
-
-            foreach (var variable in variablesToAdd)
-            {
-                existingPrompt.Variables.Add(variable);
             }
 
             try
             {
-                await _context.SaveChangesAsync();
+                var updatedTemplate = await promptService.UpdatePromptTemplateAsync(
+                    PromptTemplate.Id,
+                    PromptTemplate.Name,
+                    PromptTemplate.Content,
+                    PromptTemplate.CollectionId,
+                    PromptTemplate.Description);
+
+                if (updatedTemplate == null)
+                {
+                    // This could happen if the template was deleted between GET and POST,
+                    // or if UpdatePromptTemplateAsync returns null on some other failure.
+                    ModelState.AddModelError(string.Empty, "Could not update the prompt template. It may have been deleted.");
+                    await LoadCollectionsAsync(PromptTemplate.CollectionId);
+                    DetectedVariables = promptService.ExtractVariableNames(PromptTemplate.Content ?? "");
+                    return Page();
+                }
             }
-            catch (DbUpdateConcurrencyException)
+            catch (ArgumentException ex)
             {
-                if (!PromptTemplateExists(PromptTemplate.Id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                ModelState.AddModelError(string.Empty, ex.Message);
+                await LoadCollectionsAsync(PromptTemplate.CollectionId);
+                DetectedVariables = promptService.ExtractVariableNames(PromptTemplate.Content ?? "");
+                return Page();
+            }
+            catch (Exception ex) 
+            {   
+                ModelState.AddModelError(string.Empty, "An error occurred while updating the prompt template. " + ex.Message);
+                await LoadCollectionsAsync(PromptTemplate.CollectionId);
+                DetectedVariables = promptService.ExtractVariableNames(PromptTemplate.Content ?? "");
+                return Page();
             }
 
-            return RedirectToPage("/Index");
+            return RedirectToPage("/Index", new { message = $"Prompt '{PromptTemplate.Name}' updated successfully." });
         }
 
-        private bool PromptTemplateExists(int id)
+        private async Task LoadCollectionsAsync(int? selectedCollectionId)
         {
-            return _context.PromptTemplates.Any(e => e.Id == id);
+            var collectionsData = await promptService.GetCollectionsAsync();
+            Collections = new SelectList(collectionsData ?? [], "Id", "Name", selectedCollectionId);
         }
+    }
+
+    public class PromptTemplateViewModel
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        public string Name { get; set; } = string.Empty;
+
+        [StringLength(500)]
+        public string? Description { get; set; }
+
+        [Required]
+        public string Content { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Please select a collection")]
+        [Range(1, int.MaxValue, ErrorMessage = "Please select a valid collection")]
+        public int CollectionId { get; set; }
+
+        public List<PromptExecution> Executions { get; set; } = [];
     }
 }

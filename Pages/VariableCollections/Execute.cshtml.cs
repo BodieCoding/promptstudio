@@ -1,29 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Domain;
-using PromptStudio.Services;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 using System.Text.Json;
 using System.Text;
 
 namespace PromptStudio.Pages.VariableCollections;
 
-public class ExecuteModel : PageModel
+public class ExecuteModel(IPromptService promptService) : PageModel
 {
-    private readonly PromptStudioDbContext _context;
-    private readonly IPromptService _promptService;
-
-    public ExecuteModel(PromptStudioDbContext context, IPromptService promptService)
-    {
-        _context = context;
-        _promptService = promptService;
-    }
-
     public PromptTemplate PromptTemplate { get; set; } = default!;
     public VariableCollectionViewModel VariableCollection { get; set; } = default!;
-    public List<string> VariableNames { get; set; } = new();
-    public List<BatchExecutionResult> Results { get; set; } = new();
+    public List<string> VariableNames { get; set; } = [];
+    public List<BatchExecutionResult> Results { get; set; } = [];
     public string? Message { get; set; }
     public string? ErrorMessage { get; set; }
 
@@ -41,55 +30,50 @@ public class ExecuteModel : PageModel
 
         try
         {
-            // Get the actual domain entity
-            var variableCollectionEntity = await _context.VariableCollections
-                .FirstOrDefaultAsync(vc => vc.Id == collectionId);
-
-            if (variableCollectionEntity == null)
+            if (PromptTemplate == null || VariableCollection == null)
             {
-                return NotFound("Variable collection not found.");
+                ErrorMessage = "Prompt Template or Variable Collection not loaded correctly.";
+                return Page();
             }
 
-            // Parse variable sets from JSON
-            var variableSets = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(variableCollectionEntity.VariableSets)
-                ?? new List<Dictionary<string, string>>();
+            var variableSets = VariableCollection.VariableSets
+                                .Select(vs => vs.Variables)
+                                .ToList();
 
-            // Execute batch
-            var batchResults = _promptService.BatchExecute(PromptTemplate, variableSets);
+            var batchLogicResults = promptService.BatchExecute(PromptTemplate, variableSets);
 
-            // Convert to view model results
-            Results = batchResults.Select((result, index) => new BatchExecutionResult
+            Results = [..batchLogicResults.Select((result, index) => new BatchExecutionResult
             {
                 VariableSetIndex = index,
                 Variables = result.Variables,
                 ResolvedPrompt = result.ResolvedPrompt,
                 Success = result.Success,
                 ErrorMessage = result.Error
-            }).ToList();
+            })];
 
-            // Store successful executions in database
-            var executions = Results.Where(r => r.Success).Select(result => new PromptExecution
-            {
-                PromptTemplateId = promptId,
-                ResolvedPrompt = result.ResolvedPrompt,
-                VariableValues = JsonSerializer.Serialize(result.Variables),
-                ExecutedAt = DateTime.UtcNow,
-                AiProvider = "Manual Batch",
-                Model = "N/A"
-            }).ToList();
-
-            if (executions.Any())
-            {
-                _context.PromptExecutions.AddRange(executions);
-                await _context.SaveChangesAsync();
-
-                // Update execution IDs in results
-                for (int i = 0, j = 0; i < Results.Count; i++)
+            var executionsToSave = Results
+                .Where(r => r.Success)
+                .Select(result => new PromptExecution
                 {
-                    if (Results[i].Success)
+                    PromptTemplateId = promptId,
+                    ResolvedPrompt = result.ResolvedPrompt,
+                    VariableValues = JsonSerializer.Serialize(result.Variables),
+                    ExecutedAt = DateTime.UtcNow,
+                    AiProvider = "Manual Batch",
+                    Model = "N/A"
+                }).ToList();
+
+            if (executionsToSave.Count != 0)
+            {
+                var savedExecutions = await promptService.SavePromptExecutionsAsync(executionsToSave);
+
+                int savedIndex = 0;
+                for (int i = 0; i < Results.Count; i++)
+                {
+                    if (Results[i].Success && savedIndex < savedExecutions.Count)
                     {
-                        Results[i].ExecutionId = executions[j].Id;
-                        j++;
+                        Results[i].ExecutionId = savedExecutions[savedIndex].Id;
+                        savedIndex++;
                     }
                 }
             }
@@ -108,51 +92,43 @@ public class ExecuteModel : PageModel
     {
         await LoadDataAsync(promptId, collectionId);
 
-        // Re-execute to get fresh results (or we could store them in session/tempdata)
+        if (PromptTemplate == null || VariableCollection == null)
+        {
+            return RedirectToPage("./Execute", new { promptId, collectionId, error = "Could not load data for export." });
+        }
+
         try
         {
-            var variableCollectionEntity = await _context.VariableCollections
-                .FirstOrDefaultAsync(vc => vc.Id == collectionId);
+            var variableSets = VariableCollection.VariableSets
+                                .Select(vs => vs.Variables)
+                                .ToList();
 
-            if (variableCollectionEntity == null)
-            {
-                return NotFound("Variable collection not found.");
-            }
+            var batchLogicResults = promptService.BatchExecute(PromptTemplate, variableSets);
 
-            var variableSets = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(variableCollectionEntity.VariableSets)
-                ?? new List<Dictionary<string, string>>();
-
-            var batchResults = _promptService.BatchExecute(PromptTemplate, variableSets);
-
-            // Generate CSV content
             var csv = new StringBuilder();
 
-            // Header
-            var headers = new List<string> { "Set_Index", "Success", "Error" };
+            List<string> headers = ["Set_Index", "Success", "Error"];
             headers.AddRange(VariableNames);
             headers.Add("Resolved_Prompt");
-            csv.AppendLine(string.Join(",", headers.Select(h => $"\"{h}\"")));
+            csv.AppendLine(string.Join(",", headers.Select(h => $"\"{h.Replace("\"", "\"\"")}\"")));
 
-            // Data rows
-            for (int i = 0; i < batchResults.Count; i++)
+            for (int i = 0; i < batchLogicResults.Count; i++)
             {
-                var result = batchResults[i];
-                var row = new List<string>
-                {
+                var (Variables, ResolvedPrompt, Success, Error) = batchLogicResults[i];
+                List<string> row =
+                [
                     (i + 1).ToString(),
-                    result.Success.ToString(),
-                    result.Error ?? ""
-                };
+                    Success.ToString(),
+                    $"\"{(Error ?? "").Replace("\"", "\"\"")}\""
+                ];
 
-                // Variable values
                 foreach (var varName in VariableNames)
                 {
-                    var value = result.Variables.TryGetValue(varName, out var val) ? val : "";
-                    row.Add($"\"{value.Replace("\"", "\"\"")}\""); // Escape quotes
+                    var value = Variables.TryGetValue(varName, out var val) ? val : "";
+                    row.Add($"\"{value.Replace("\"", "\"\"")}\"");
                 }
 
-                // Resolved prompt
-                row.Add($"\"{result.ResolvedPrompt.Replace("\"", "\"\"")}\"");
+                row.Add($"\"{ResolvedPrompt.Replace("\"", "\"\"")}\"");
 
                 csv.AppendLine(string.Join(",", row));
             }
@@ -173,31 +149,32 @@ public class ExecuteModel : PageModel
 
     private async Task LoadDataAsync(int promptId, int collectionId)
     {
-        PromptTemplate = await _context.PromptTemplates
-            .Include(pt => pt.Variables)
-            .FirstOrDefaultAsync(pt => pt.Id == promptId) ?? throw new InvalidOperationException("Prompt template not found.");
+        PromptTemplate = await promptService.GetPromptTemplateByIdAsync(promptId)
+           ?? throw new InvalidOperationException($"Prompt template with ID {promptId} not found.");
 
-        var collectionEntity = await _context.VariableCollections
-            .FirstOrDefaultAsync(vc => vc.Id == collectionId) ?? throw new InvalidOperationException("Variable collection not found.");
+        var allVariableCollectionsForPrompt = await promptService.GetVariableCollectionsAsync(promptId)
+            ?? throw new InvalidOperationException($"Variable collections not found for prompt ID {promptId}.");
 
-        VariableNames = _promptService.ExtractVariableNames(PromptTemplate.Content);
+        VariableNames = promptService.ExtractVariableNames(PromptTemplate.Content);
 
-        // Convert to view model
+        var specificVariableCollection = allVariableCollectionsForPrompt
+            .FirstOrDefault(vc => vc.Id == collectionId) ?? throw new InvalidOperationException($"Variable collection with ID {collectionId} not found for prompt ID {promptId}.");
+
         VariableCollection = new VariableCollectionViewModel
         {
-            Id = collectionEntity.Id,
-            Name = collectionEntity.Name,
-            Description = collectionEntity.Description,
-            PromptTemplateId = collectionEntity.PromptTemplateId,
+            Id = specificVariableCollection.Id,
+            Name = specificVariableCollection.Name,
+            Description = specificVariableCollection.Description,
+            PromptTemplateId = specificVariableCollection.PromptTemplateId,
             PromptTemplateName = PromptTemplate.Name,
-            VariableSets = string.IsNullOrEmpty(collectionEntity.VariableSets)
-                ? new List<VariableSetViewModel>()
-                : JsonSerializer.Deserialize<List<Dictionary<string, string>>>(collectionEntity.VariableSets)?
+            VariableSets = string.IsNullOrEmpty(specificVariableCollection.VariableSets)
+                ? []
+                : JsonSerializer.Deserialize<List<Dictionary<string, string>>>(specificVariableCollection.VariableSets)?
                     .Select(dict => new VariableSetViewModel { Variables = dict })
-                    .ToList() ?? new List<VariableSetViewModel>(),
+                    .ToList() ?? [],
             VariableNames = VariableNames,
-            CreatedAt = collectionEntity.CreatedAt,
-            UpdatedAt = collectionEntity.UpdatedAt
+            CreatedAt = specificVariableCollection.CreatedAt,
+            UpdatedAt = specificVariableCollection.UpdatedAt
         };
     }
 }

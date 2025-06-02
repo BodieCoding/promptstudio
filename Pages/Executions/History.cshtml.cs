@@ -1,22 +1,15 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Domain;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 using System.Text.Json;
 
 namespace PromptStudio.Pages.Executions
 {
-    public class HistoryModel : PageModel
+    public class HistoryModel(IPromptService promptService) : PageModel
     {
-        private readonly PromptStudioDbContext _context;
         private const int PageSize = 12;
 
-        public HistoryModel(PromptStudioDbContext context)
-        {
-            _context = context;
-        }
-
-        public List<ExecutionViewModel> Executions { get; set; } = new();
+        public List<ExecutionViewModel> Executions { get; set; } = [];
         public int CurrentPage { get; set; } = 1;
         public int TotalPages { get; set; } = 1;
 
@@ -24,35 +17,34 @@ namespace PromptStudio.Pages.Executions
         {
             CurrentPage = page;
 
-            var totalExecutions = await _context.PromptExecutions.CountAsync();
+            var totalExecutions = await promptService.GetTotalExecutionsCountAsync();
             TotalPages = (int)Math.Ceiling(totalExecutions / (double)PageSize);
+            if (TotalPages == 0) TotalPages = 1;
+            if (CurrentPage > TotalPages) CurrentPage = TotalPages;
+            if (CurrentPage < 1) CurrentPage = 1;
 
-            var executions = await _context.PromptExecutions
-                .Include(e => e.PromptTemplate)
-                    .ThenInclude(p => p.Collection)
-                .OrderByDescending(e => e.ExecutedAt)
-                .Skip((page - 1) * PageSize)
-                .Take(PageSize)
-                .ToListAsync();
+            var executionsData = await promptService.GetExecutionHistoryAsync(CurrentPage, PageSize);
 
-            Executions = executions.Select(e => new ExecutionViewModel
+            Executions = [..executionsData.Select(e => new ExecutionViewModel
             {
                 Id = e.Id,
                 PromptTemplate = e.PromptTemplate,
                 ResolvedPrompt = e.ResolvedPrompt,
                 ExecutedAt = e.ExecutedAt,
-                VariableValues = string.IsNullOrEmpty(e.VariableValues) 
-                    ? new Dictionary<string, string>() 
-                    : JsonSerializer.Deserialize<Dictionary<string, string>>(e.VariableValues) ?? new Dictionary<string, string>()
-            }).ToList();
-        }        public class ExecutionViewModel
+                VariableValues = string.IsNullOrEmpty(e.VariableValues)
+                    ? []
+                    : JsonSerializer.Deserialize<Dictionary<string, string>>(e.VariableValues) ?? []
+            })];
+        }
+
+        public class ExecutionViewModel
         {
             public int Id { get; set; }
-            public PromptTemplate PromptTemplate { get; set; } = null!;
+            public PromptTemplate PromptTemplate { get; set; } = default!;
             public string ResolvedPrompt { get; set; } = string.Empty;
             public DateTime ExecutedAt { get; set; }
-            public Dictionary<string, string> VariableValues { get; set; } = new();
-            public int PromptTemplateId => PromptTemplate.Id;
+            public Dictionary<string, string> VariableValues { get; set; } = [];
+            public int PromptTemplateId => PromptTemplate?.Id ?? 0;
         }
     }
 }

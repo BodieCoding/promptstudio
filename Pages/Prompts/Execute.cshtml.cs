@@ -1,24 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Domain;
-using PromptStudio.Services;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 using System.Text.Json;
 
 namespace PromptStudio.Pages.Prompts;
 
-public class ExecuteModel : PageModel
+public class ExecuteModel(IPromptService promptService) : PageModel
 {
-    private readonly PromptStudioDbContext _context;
-    private readonly IPromptService _promptService;
-
-    public ExecuteModel(PromptStudioDbContext context, IPromptService promptService)
-    {
-        _context = context;
-        _promptService = promptService;
-    }
-
     public PromptTemplate PromptTemplate { get; set; } = null!;
 
     [BindProperty]
@@ -28,20 +17,20 @@ public class ExecuteModel : PageModel
 
     public async Task<IActionResult> OnGetAsync(int id)
     {
-        PromptTemplate = await _context.PromptTemplates
-            .Include(pt => pt.Variables)
-            .Include(pt => pt.Collection)
-            .FirstOrDefaultAsync(pt => pt.Id == id);
+        PromptTemplate? promptTemplate = await promptService.GetPromptTemplateByIdAsync(id);
 
-        if (PromptTemplate == null)
+        if (promptTemplate == null)
         {
             return NotFound();
         }
 
-        // Initialize variable values with defaults
-        foreach (var variable in PromptTemplate.Variables)
+        PromptTemplate = promptTemplate;
+
+        // Initialize variable values with defaults using LINQ and ToDictionary
+        if (PromptTemplate.Variables != null)
         {
-            VariableValues[variable.Name] = variable.DefaultValue ?? "";
+            VariableValues = PromptTemplate.Variables
+                .ToDictionary(variable => variable.Name, variable => variable.DefaultValue ?? "");
         }
 
         return Page();
@@ -49,19 +38,18 @@ public class ExecuteModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(int id)
     {
-        PromptTemplate = await _context.PromptTemplates
-            .Include(pt => pt.Variables)
-            .Include(pt => pt.Collection)
-            .FirstOrDefaultAsync(pt => pt.Id == id);
+        PromptTemplate? promptTemplate = await promptService.GetPromptTemplateByIdAsync(id);
 
-        if (PromptTemplate == null)
+        if (promptTemplate == null)
         {
             return NotFound();
         }
 
-        if (_promptService.ValidateVariables(PromptTemplate, VariableValues))
+        PromptTemplate = promptTemplate;
+
+        if (promptService.ValidateVariables(PromptTemplate, VariableValues))
         {
-            ResolvedPrompt = _promptService.ResolvePrompt(PromptTemplate, VariableValues);
+            ResolvedPrompt = promptService.ResolvePrompt(PromptTemplate, VariableValues);
 
             // Save execution history
             var execution = new PromptExecution
@@ -72,8 +60,7 @@ public class ExecuteModel : PageModel
                 ExecutedAt = DateTime.UtcNow
             };
 
-            _context.PromptExecutions.Add(execution);
-            await _context.SaveChangesAsync();
+            await promptService.SavePromptExecutionsAsync([execution]); // Use collection initializer for the list
         }
         else
         {

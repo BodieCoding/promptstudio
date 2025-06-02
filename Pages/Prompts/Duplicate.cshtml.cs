@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using PromptStudio.Data;
-using PromptStudio.Domain;
-using PromptStudio.Services;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 
 namespace PromptStudio.Pages.Prompts
 {    public class DuplicateModel : PageModel

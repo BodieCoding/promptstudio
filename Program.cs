@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Services;
+using PromptStudio.Core.Data;
+using PromptStudio.Core.Services;
+using PromptStudio.Core.Interfaces;
 
 // Create the web application builder
 var builder = WebApplication.CreateBuilder(args);
@@ -9,14 +10,12 @@ var builder = WebApplication.CreateBuilder(args);
 {
     // Add MVC, API Controllers, and Razor Pages
     builder.Services.AddControllers();
-    builder.Services.AddRazorPages();
-
-    // Configure Entity Framework with SQL Server
+    builder.Services.AddRazorPages();      // Configure Entity Framework with SQLite
     builder.Services.AddDbContext<PromptStudioDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
     // Register application services
-    builder.Services.AddScoped<IPromptService, PromptService>();
+    builder.Services.AddScoped<IPromptService, PromptStudio.Core.Services.PromptService>();
 }
 
 // Build the application
@@ -40,7 +39,9 @@ using (var scope = app.Services.CreateScope())
 
     // Enable HTTPS redirection and static files
     app.UseHttpsRedirection();
-    app.UseStaticFiles();    // Enable routing and authorization
+    app.UseStaticFiles();
+    
+    // Enable routing and authorization
     app.UseRouting();
     app.UseAuthorization();
 
@@ -51,3 +52,6 @@ using (var scope = app.Services.CreateScope())
 
 // Start the application
 app.Run();
+
+// Make the implicit Program class accessible to test projects
+public partial class Program { }

@@ -1,23 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Domain;
-using PromptStudio.Services;
+using PromptStudio.Core.Interfaces;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace PromptStudio.Pages.Collections
-{    public class ImportModel : PageModel
+{
+    public class ImportModel(IPromptService promptService) : PageModel
     {
-        private readonly PromptStudioDbContext _context;
-        private readonly IPromptService _promptService;
-
-        public ImportModel(PromptStudioDbContext context, IPromptService promptService)
-        {
-            _context = context;
-            _promptService = promptService;
-        }
-
         [BindProperty]
         public IFormFile ImportFile { get; set; } = default!;
 
@@ -34,6 +24,51 @@ namespace PromptStudio.Pages.Collections
         {
         }
 
+        // This method pre-processes the JSON to handle potential legacy formats for VariableType
+        private static string SanitizeVariableTypes(string jsonContent)
+        {
+            try
+            {
+                var root = JsonNode.Parse(jsonContent);
+                if (root == null) return jsonContent;
+
+                // Try both possible locations for prompts
+                JsonArray? prompts = root["collection"]?["prompts"] as JsonArray
+                                     ?? root["prompts"] as JsonArray;
+
+                if (prompts != null)
+                {
+                    foreach (var promptNode in prompts)
+                    {
+                        if (promptNode?["variables"] is JsonArray variables)
+                        {
+                            foreach (var variableNode in variables)
+                            {
+                                var typeNode = variableNode?["type"];
+                                if (typeNode != null && typeNode.GetValueKind() == JsonValueKind.Number)
+                                {
+                                    // Ensure variableNode is not null before assignment
+                                    variableNode!["type"] = JsonValue.Create("Text")
+                                                            ?? throw new InvalidOperationException("Failed to create JSON value for variable type.");
+                                }
+                            }
+                        }
+                    }
+                }
+                return root.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+            }
+            catch (JsonException)
+            {
+                // If JSON parsing fails during sanitization, return original content
+                return jsonContent;
+            }
+            catch (Exception)
+            {
+                // For other errors during sanitization, return original (fail gracefully)
+                return jsonContent;
+            }
+        }
+
         public async Task<IActionResult> OnPostAsync()
         {
             if (ImportFile == null || ImportFile.Length == 0)
@@ -44,164 +79,61 @@ namespace PromptStudio.Pages.Collections
 
             if (!ImportFile.FileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             {
-                ErrorMessage = "Only JSON files are supported.";
+                ErrorMessage = "Only JSON files are supported for import.";
                 return Page();
             }
 
             try
             {
-                using var stream = ImportFile.OpenReadStream();
-                using var reader = new StreamReader(stream);
-                var jsonContent = await reader.ReadToEndAsync();
-
-                var importData = JsonSerializer.Deserialize<ImportData>(jsonContent, new JsonSerializerOptions
+                string jsonContent;
+                using (var stream = ImportFile.OpenReadStream())
+                using (var reader = new StreamReader(stream))
                 {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                if (importData?.Collection == null)
-                {
-                    ErrorMessage = "Invalid file format. Please ensure this is a valid PromptStudio export file.";
-                    return Page();
+                    jsonContent = await reader.ReadToEndAsync();
                 }
 
-                // Check if collection already exists
-                var existingCollection = await _context.Collections
-                    .FirstOrDefaultAsync(c => c.Name == importData.Collection.Name);
+                // Sanitize variable type fields before passing to the service
+                var sanitizedJsonContent = SanitizeVariableTypes(jsonContent);
 
-                Collection targetCollection;
+                var importedCollection = await promptService.ImportCollectionFromJsonAsync(
+                    sanitizedJsonContent,
+                    ImportExecutionHistory,
+                    OverwriteExisting);
 
-                if (existingCollection != null && OverwriteExisting)
+                if (importedCollection != null)
                 {
-                    // Remove existing collection and its data
-                    _context.Collections.Remove(existingCollection);
-                    await _context.SaveChangesAsync();
+                    SuccessMessage = $"Successfully imported collection '{importedCollection.Name}'.";
+                    // Clear form fields on success
+                    ImportFile = default!;
+                    ImportExecutionHistory = false;
+                    OverwriteExisting = false;
                 }
-
-                // Create new collection
-                var collectionName = importData.Collection.Name;
-                if (existingCollection != null && !OverwriteExisting)
+                else
                 {
-                    // Find a unique name
-                    var counter = 1;
-                    while (await _context.Collections.AnyAsync(c => c.Name == $"{collectionName} ({counter})"))
-                    {
-                        counter++;
-                    }
-                    collectionName = $"{collectionName} ({counter})";
+                    ErrorMessage = "Failed to import collection. The file format might be invalid or an unexpected error occurred.";
                 }
-
-                targetCollection = new Collection
-                {
-                    Name = collectionName,
-                    Description = importData.Collection.Description,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-
-                _context.Collections.Add(targetCollection);
-                await _context.SaveChangesAsync();
-
-                // Import prompts
-                foreach (var promptData in importData.Collection.Prompts ?? new List<PromptData>())
-                {
-                    var prompt = new PromptTemplate
-                    {
-                        Name = promptData.Name ?? "Untitled Prompt",
-                        Description = promptData.Description,
-                        Content = promptData.Content,
-                        CollectionId = targetCollection.Id,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-
-                    _context.PromptTemplates.Add(prompt);
-                    await _context.SaveChangesAsync();                    // Import variables (auto-detect from content to ensure consistency)
-                    var variables = _promptService.ExtractVariableNames(prompt.Content ?? "");
-                    foreach (var variableName in variables)
-                    {                        var variable = new PromptVariable
-                        {
-                            Name = variableName,
-                            PromptTemplateId = prompt.Id,
-                            Description = promptData.Variables?.FirstOrDefault(v => v.Name == variableName)?.Description,
-                            DefaultValue = promptData.Variables?.FirstOrDefault(v => v.Name == variableName)?.DefaultValue,
-                            Type = Enum.TryParse<VariableType>(promptData.Variables?.FirstOrDefault(v => v.Name == variableName)?.Type ?? "Text", true, out var type) ? type : VariableType.Text
-                        };
-                        _context.PromptVariables.Add(variable);
-                    }
-
-                    // Import execution history if requested
-                    if (ImportExecutionHistory && promptData.ExecutionHistory != null)
-                    {
-                        foreach (var executionData in promptData.ExecutionHistory)
-                        {                            var execution = new PromptExecution
-                            {
-                                PromptTemplateId = prompt.Id,
-                                VariableValues = executionData.VariableValues,
-                                ResolvedPrompt = executionData.ResolvedPrompt,
-                                ExecutedAt = executionData.ExecutedAt
-                            };
-                            _context.PromptExecutions.Add(execution);
-                        }
-                    }
-                }
-
-                await _context.SaveChangesAsync();
-
-                SuccessMessage = $"Successfully imported collection '{targetCollection.Name}' with {importData.Collection.Prompts?.Count ?? 0} prompts.";
-                
-                // Clear form
-                ImportFile = null!;
-                ImportExecutionHistory = false;
-                OverwriteExisting = false;
 
                 return Page();
             }
-            catch (JsonException)
+            catch (JsonException jsonEx)
             {
-                ErrorMessage = "Invalid JSON format. Please ensure this is a valid PromptStudio export file.";
+                ErrorMessage = $"Invalid JSON format: {jsonEx.Message}. Please ensure this is a valid PromptStudio export file.";
+                return Page();
+            }
+            catch (ArgumentException argEx)
+            {
+                ErrorMessage = $"Import error: {argEx.Message}";
                 return Page();
             }
             catch (Exception ex)
             {
-                ErrorMessage = $"Error importing collection: {ex.Message}";
+                // Catching DbUpdateException or other specific exceptions if thrown by the service
+                ErrorMessage = $"An unexpected error occurred during import: {ex.Message}";
                 return Page();
             }
         }
 
-        // Data classes for deserialization
-        public class ImportData
-        {
-            public CollectionData? Collection { get; set; }
-        }
-
-        public class CollectionData
-        {
-            public string? Name { get; set; }
-            public string? Description { get; set; }
-            public List<PromptData>? Prompts { get; set; }
-        }
-
-        public class PromptData
-        {
-            public string? Name { get; set; }
-            public string? Description { get; set; }
-            public string? Content { get; set; }
-            public List<VariableData>? Variables { get; set; }
-            public List<ExecutionData>? ExecutionHistory { get; set; }
-        }
-
-        public class VariableData
-        {
-            public string? Name { get; set; }
-            public string? Description { get; set; }
-            public string? DefaultValue { get; set; }
-            public string? Type { get; set; }
-        }        public class ExecutionData
-        {
-            public DateTime ExecutedAt { get; set; }
-            public string? VariableValues { get; set; }
-            public string? ResolvedPrompt { get; set; }
-        }
+        // Data classes for deserialization are no longer needed here if the service handles parsing.
+        // If SanitizeVariableTypes needed them, they would remain, but it uses JsonNode.
     }
 }

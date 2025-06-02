@@ -1,28 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Domain;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 
 namespace PromptStudio.Pages.Collections
 {
-    public class DeleteModel : PageModel
+    public class DeleteModel(IPromptService promptService) : PageModel
     {
-        private readonly PromptStudioDbContext _context;
-
-        public DeleteModel(PromptStudioDbContext context)
-        {
-            _context = context;
-        }
-
         [BindProperty]
         public Collection Collection { get; set; } = default!;
 
         public async Task<IActionResult> OnGetAsync(int id)
         {
-            var collection = await _context.Collections
-                .Include(c => c.PromptTemplates)
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var collection = await promptService.GetCollectionByIdAsync(id);
 
             if (collection == null)
             {
@@ -35,21 +25,27 @@ namespace PromptStudio.Pages.Collections
 
         public async Task<IActionResult> OnPostAsync()
         {
-            var collection = await _context.Collections
-                .Include(c => c.PromptTemplates)
-                    .ThenInclude(p => p.Variables)
-                .Include(c => c.PromptTemplates)
-                    .ThenInclude(p => p.Executions)
-                .FirstOrDefaultAsync(c => c.Id == Collection.Id);
-
-            if (collection != null)
+            if (Collection == null || Collection.Id <= 0)
             {
-                // Remove all related data (EF Core will handle cascading delete if configured)
-                _context.Collections.Remove(collection);
-                await _context.SaveChangesAsync();
+                return Page();
             }
 
-            return RedirectToPage("/Index");
+            var success = await promptService.DeleteCollectionAsync(Collection.Id);
+
+            if (!success)
+            {
+                ModelState.AddModelError(string.Empty, "Could not delete the collection. It might have already been deleted or an error occurred.");
+
+                var currentCollection = await promptService.GetCollectionByIdAsync(Collection.Id);
+                if (currentCollection != null)
+                {
+                    Collection = currentCollection;
+                }
+
+                return Page();
+            }
+
+            return RedirectToPage("/Index", new { message = $"Collection '{Collection.Name}' and all its contents were deleted successfully." });
         }
     }
 }

@@ -1,21 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Domain;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 using System.Text.Json;
 
 namespace PromptStudio.Pages.Collections
 {
-    public class ExportModel : PageModel
+    public class ExportModel(IPromptService promptService) : PageModel
     {
-        private readonly PromptStudioDbContext _context;
-
-        public ExportModel(PromptStudioDbContext context)
-        {
-            _context = context;
-        }
-
         [BindProperty]
         public Collection Collection { get; set; } = default!;
 
@@ -24,12 +16,7 @@ namespace PromptStudio.Pages.Collections
 
         public async Task<IActionResult> OnGetAsync(int id)
         {
-            var collection = await _context.Collections
-                .Include(c => c.PromptTemplates)
-                    .ThenInclude(p => p.Variables)
-                .Include(c => c.PromptTemplates)
-                    .ThenInclude(p => p.Executions)
-                .FirstOrDefaultAsync(c => c.Id == id);
+            var collection = await promptService.GetCollectionByIdAsync(id);
 
             if (collection == null)
             {
@@ -42,12 +29,7 @@ namespace PromptStudio.Pages.Collections
 
         public async Task<IActionResult> OnPostAsync()
         {
-            var collection = await _context.Collections
-                .Include(c => c.PromptTemplates)
-                    .ThenInclude(p => p.Variables)
-                .Include(c => c.PromptTemplates)
-                    .ThenInclude(p => p.Executions)
-                .FirstOrDefaultAsync(c => c.Id == Collection.Id);
+            var collection = await promptService.GetCollectionByIdAsync(Collection.Id);
 
             if (collection == null)
             {
@@ -62,27 +44,29 @@ namespace PromptStudio.Pages.Collections
                 {
                     collection.Name,
                     collection.Description,
-                    CreatedAt = collection.CreatedAt,
+                    collection.CreatedAt,
                     Prompts = collection.PromptTemplates.Select(p => new
                     {
                         p.Name,
                         p.Description,
                         p.Content,
-                        CreatedAt = p.CreatedAt,
-                        UpdatedAt = p.UpdatedAt,
+                        p.CreatedAt,
+                        p.UpdatedAt,
                         Variables = p.Variables.Select(v => new
                         {
                             v.Name,
                             v.Description,
                             v.DefaultValue,
-                            v.Type
+                            Type = v.Type.ToString()
                         }),
-                        ExecutionHistory = IncludeExecutionHistory ? p.Executions                        .Select(e => new
-                        {
-                            ExecutedAt = e.ExecutedAt,
-                            VariableValues = e.VariableValues,
-                            ResolvedPrompt = e.ResolvedPrompt
-                        }) : null
+                        ExecutionHistory = IncludeExecutionHistory && p.Executions != null
+                            ? p.Executions.Select(e => new
+                            {
+                                e.ExecutedAt,
+                                e.VariableValues,
+                                e.ResolvedPrompt
+                            })
+                            : null
                     })
                 }
             };

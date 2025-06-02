@@ -1,26 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Domain;
-using PromptStudio.Services;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
-using System.Text.Json;
 
 namespace PromptStudio.Pages.VariableCollections;
 
-public class CreateModel : PageModel
+public class CreateModel(IPromptService promptService) : PageModel
 {
-    private readonly PromptStudioDbContext _context;
-    private readonly IPromptService _promptService;
-
-    public CreateModel(PromptStudioDbContext context, IPromptService promptService)
-    {
-        _context = context;
-        _promptService = promptService;
-    }
-
     [BindProperty]
     public int PromptId { get; set; }
 
@@ -38,14 +26,12 @@ public class CreateModel : PageModel
     public IFormFile CsvFile { get; set; } = default!;
 
     public PromptTemplate PromptTemplate { get; set; } = default!;
-    public List<string> VariableNames { get; set; } = new();
+    public List<string> VariableNames { get; set; } = [];
     public string SampleCsv { get; set; } = string.Empty;
 
     public async Task<IActionResult> OnGetAsync(int promptId)
     {
-        var template = await _context.PromptTemplates
-            .Include(pt => pt.Variables)
-            .FirstOrDefaultAsync(pt => pt.Id == promptId);
+        var template = await promptService.GetPromptTemplateByIdAsync(promptId);
 
         if (template == null)
         {
@@ -54,74 +40,67 @@ public class CreateModel : PageModel
 
         PromptTemplate = template;
         PromptId = promptId;
-        VariableNames = _promptService.ExtractVariableNames(template.Content);
-        SampleCsv = _promptService.GenerateVariableCsvTemplate(template);
+        VariableNames = promptService.ExtractVariableNames(template.Content);
+        SampleCsv = promptService.GenerateVariableCsvTemplate(template);
 
         return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        // Reload template for validation
-        var template = await _context.PromptTemplates
-            .Include(pt => pt.Variables)
-            .FirstOrDefaultAsync(pt => pt.Id == PromptId);
-
-        if (template == null)
-        {
-            return NotFound();
-        }
+        var template = await promptService.GetPromptTemplateByIdAsync(PromptId);
+        if (template == null)        
+            return NotFound();      
 
         PromptTemplate = template;
-        VariableNames = _promptService.ExtractVariableNames(template.Content);
-        SampleCsv = _promptService.GenerateVariableCsvTemplate(template);
+        VariableNames = promptService.ExtractVariableNames(template.Content);
+        SampleCsv = promptService.GenerateVariableCsvTemplate(template);
 
         if (!ModelState.IsValid)
         {
             return Page();
         }
 
+        string csvContent;
         try
         {
             // Read CSV file
-            string csvContent;
             using (var reader = new StreamReader(CsvFile.OpenReadStream(), Encoding.UTF8))
             {
                 csvContent = await reader.ReadToEndAsync();
             }
 
-            // Parse CSV
-            var variableSets = _promptService.ParseVariableCsv(csvContent, VariableNames);
+            // Parse CSV locally to get the count for the message and for early validation
+            // The service will also parse it, but this gives immediate feedback.
+            var variableSetsForCount = promptService.ParseVariableCsv(csvContent, VariableNames);
 
-            if (!variableSets.Any())
+            if (variableSetsForCount.Count == 0)
             {
-                ModelState.AddModelError("CsvData", "CSV file contains no data rows.");
+                ModelState.AddModelError(nameof(CsvFile), "CSV file contains no data rows after the header.");
                 return Page();
             }
 
-            // Create variable collection
-            var variableCollection = new VariableCollection
-            {
-                Name = Name,
-                Description = Description,
-                PromptTemplateId = PromptId,
-                VariableSets = JsonSerializer.Serialize(variableSets),
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            _context.VariableCollections.Add(variableCollection);
-            await _context.SaveChangesAsync();
+            // Create variable collection using the service
+            // The service method CreateVariableCollectionAsync takes the raw csvData.
+            var createdCollection = await promptService.CreateVariableCollectionAsync(Name, PromptId, csvContent, Description);
 
             return RedirectToPage("./Index", new
             {
                 promptId = PromptId,
-                message = $"Variable collection '{Name}' created successfully with {variableSets.Count} variable sets."
+                message = $"Variable collection '{createdCollection.Name}' created successfully with {variableSetsForCount.Count} variable sets."
             });
         }
-        catch (Exception ex)
+        catch (ArgumentException ex) // Catch specific exceptions from ParseVariableCsv or CreateVariableCollectionAsync
         {
-            ModelState.AddModelError("CsvData", $"Error processing CSV file: {ex.Message}");
+            // ArgumentException is thrown by ParseVariableCsv for header issues or row length mismatches.
+            // It might also be thrown by CreateVariableCollectionAsync if promptId is invalid.
+            ModelState.AddModelError(nameof(CsvFile), $"Error processing CSV file: {ex.Message}");
+            return Page();
+        }
+        catch (Exception ex) // Catch any other unexpected errors
+        {
+            // Log the full exception ex for debugging
+            ModelState.AddModelError(string.Empty, $"An unexpected error occurred: {ex.Message}");
             return Page();
         }
     }

@@ -1,19 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using PromptStudio.Data;
-using PromptStudio.Domain;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 
 namespace PromptStudio.Pages.Collections;
 
-public class CreateModel : PageModel
+public class CreateModel(IPromptService promptService) : PageModel
 {
-    private readonly PromptStudioDbContext _context;
-
-    public CreateModel(PromptStudioDbContext context)
-    {
-        _context = context;
-    }
-
     [BindProperty]
     public Collection Collection { get; set; } = new();
 
@@ -27,13 +20,9 @@ public class CreateModel : PageModel
         if (!ModelState.IsValid)
         {
             return Page();
-        }
-
-        Collection.CreatedAt = DateTime.UtcNow;
-        Collection.UpdatedAt = DateTime.UtcNow;
-
-        _context.Collections.Add(Collection);
-        await _context.SaveChangesAsync();
+        }        
+        
+        await promptService.CreateCollectionAsync(Collection.Name, Collection.Description);
 
         return RedirectToPage("/Index");
     }

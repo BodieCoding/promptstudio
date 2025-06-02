@@ -1,30 +1,14 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using PromptStudio.Data;
-using PromptStudio.Domain;
-using PromptStudio.Services;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
+using System.ComponentModel.DataAnnotations;
 
 namespace PromptStudio.Pages.Prompts;
 
-public class CreateModel : PageModel
+public class CreateModel(IPromptService promptService, ILogger<CreateModel> logger) : PageModel
 {
-    private readonly PromptStudioDbContext _context;
-    private readonly IPromptService _promptService;
-    private readonly ILogger<CreateModel> _logger;
-
-    public CreateModel(PromptStudioDbContext context,
-                       IPromptService promptService,
-                       ILogger<CreateModel> logger)
-    {
-        _context = context;
-        _promptService = promptService;
-        _logger = logger;
-    }
-
     [BindProperty]
     public PromptTemplate PromptTemplate { get; set; } = new();
 
@@ -37,85 +21,63 @@ public class CreateModel : PageModel
 
     public async Task<IActionResult> OnGetAsync(int? collectionId)
     {
-        await LoadCollections();
+        await LoadCollectionsAsync();
 
         if (collectionId.HasValue)
         {
             CollectionId = collectionId.Value;
-            PromptTemplate.CollectionId = collectionId.Value;
         }
+
+        PromptTemplate ??= new PromptTemplate();
 
         return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
-    {      
-        PromptTemplate.CollectionId = CollectionId;
-        PromptTemplate.CreatedAt = DateTime.UtcNow;
-        PromptTemplate.UpdatedAt = DateTime.UtcNow;
-
-        try
+    {
+        if (!ModelState.IsValid)
         {
-            _context.PromptTemplates.Add(PromptTemplate);
-            _logger.LogInformation("Adding prompt template with ID: {Id}", PromptTemplate.Id);
-            _logger.LogInformation("Prompt template content: {Content}", PromptTemplate.Content);
-            _logger.LogInformation("Prompt template collection ID: {CollectionId}", PromptTemplate.CollectionId);
-            _logger.LogInformation("Prompt template created at: {CreatedAt}", PromptTemplate.CreatedAt);
-            _logger.LogInformation("Prompt template updated at: {UpdatedAt}", PromptTemplate.UpdatedAt);
-            _logger.LogInformation("Saving prompt template...");
-            var result = await _context.SaveChangesAsync();
-            _logger.LogInformation("SaveChangesAsync completed with result: {Result}", result);
-            _logger.LogInformation("Prompt template saved with ID: {Id}", PromptTemplate.Id);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error saving prompt template");
-
-            if (ex.InnerException != null)
-            {
-                _logger.LogError(ex.InnerException, "Inner exception when saving prompt template");
-            }
-
-            ModelState.AddModelError(string.Empty, "An error occurred while saving the prompt template.");
-            await LoadCollections();
+            await LoadCollectionsAsync();
             return Page();
-        }        // Extract and create variables
+        }
+
         try
         {
-            var variableNames = _promptService.ExtractVariableNames(PromptTemplate.Content);
-            _logger.LogInformation("Extracted {Count} variables: {Variables}", variableNames.Count, string.Join(", ", variableNames));
+            var createdTemplate = await promptService.CreatePromptTemplateAsync(
+                PromptTemplate.Name,
+                PromptTemplate.Content,
+                CollectionId,
+                PromptTemplate.Description);
 
-            foreach (var variableName in variableNames)
+            if (createdTemplate == null)
             {
-                var variable = new PromptVariable
-                {
-                    Name = variableName,
-                    Type = VariableType.Text,
-                    PromptTemplateId = PromptTemplate.Id,
-                    CreatedAt = DateTime.UtcNow
-                };
-                _logger.LogDebug("Adding variable: {VariableName} for prompt template {TemplateId}", variableName, PromptTemplate.Id);
-                _context.PromptVariables.Add(variable);
+                ModelState.AddModelError(string.Empty, "Could not create the prompt template.");
+                await LoadCollectionsAsync();
+                return Page();
             }
 
-            var varSaveResult = await _context.SaveChangesAsync();
-            _logger.LogInformation("Variables saved successfully, SaveChangesAsync result: {Result}", varSaveResult);
+            logger.LogInformation("Prompt template created with ID: {Id}", createdTemplate.Id);
+            return RedirectToPage("./Index", new { message = $"Prompt '{createdTemplate.Name}' created successfully." });
+        }
+        catch (ArgumentException ex)
+        {
+            logger.LogError(ex, "Argument error creating prompt template");
+            ModelState.AddModelError(string.Empty, ex.Message);
+            await LoadCollectionsAsync();
+            return Page();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error saving variables");
-            // Continue execution even if variable extraction fails
+            logger.LogError(ex, "Error creating prompt template");
+            ModelState.AddModelError(string.Empty, "An unexpected error occurred while creating the prompt template.");
+            await LoadCollectionsAsync();
+            return Page();
         }
-
-        return RedirectToPage("/Index");
     }
 
-    private async Task LoadCollections()
+    private async Task LoadCollectionsAsync()
     {
-        var collections = await _context.Collections
-            .OrderBy(c => c.Name)
-            .ToListAsync();
-
-        Collections = new SelectList(collections, "Id", "Name", CollectionId);
+        var collectionsData = await promptService.GetCollectionsAsync();
+        Collections = new SelectList(collectionsData ?? [], "Id", "Name", CollectionId);
     }
 }

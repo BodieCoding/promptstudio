@@ -1,27 +1,14 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using PromptStudio.Data;
-using PromptStudio.Domain;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 
 namespace PromptStudio.Pages;
 
-public class IndexModel : PageModel
+public class IndexModel(IPromptService promptService) : PageModel
 {
-    private readonly PromptStudioDbContext _context;
+    private readonly IPromptService _promptService = promptService;
 
-    public IndexModel(PromptStudioDbContext context)
-    {
-        _context = context;
-    }
+    public IList<Collection> Collections = [];
 
-    public IList<Collection> Collections { get; set; } = new List<Collection>();
-
-    public async Task OnGetAsync()
-    {
-        Collections = await _context.Collections
-            .Include(c => c.PromptTemplates)
-            .ThenInclude(pt => pt.Variables)
-            .OrderBy(c => c.Name)
-            .ToListAsync();
-    }
+    public async Task OnGetAsync() => Collections = await _promptService.GetCollectionsAsync();
 }

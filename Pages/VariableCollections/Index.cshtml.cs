@@ -2,53 +2,40 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using PromptStudio.Data;
-using PromptStudio.Domain;
-using PromptStudio.Services;
+using PromptStudio.Core.Domain;
+using PromptStudio.Core.Interfaces;
 using System.Text.Json;
 
 namespace PromptStudio.Pages.VariableCollections;
 
-public class IndexModel : PageModel
+public class IndexModel(IPromptService promptService) : PageModel
 {
-    private readonly PromptStudioDbContext _context;
-    private readonly IPromptService _promptService;
-
-    public IndexModel(PromptStudioDbContext context, IPromptService promptService)
-    {
-        _context = context;
-        _promptService = promptService;
-    }
-
     public PromptTemplate PromptTemplate { get; set; } = default!;
-    public List<VariableCollectionViewModel> VariableCollections { get; set; } = new();
-    public List<string> VariableNames { get; set; } = new();
+    public List<VariableCollectionViewModel> VariableCollections { get; set; } = [];
+    public List<string> VariableNames { get; set; } = [];
     public string? Message { get; set; }
     public string? ErrorMessage { get; set; }
 
     public async Task<IActionResult> OnGetAsync(int promptId, string? message = null, string? error = null)
     {
-        var template = await _context.PromptTemplates
-            .Include(pt => pt.Collection)
-            .Include(pt => pt.Variables)
-            .FirstOrDefaultAsync(pt => pt.Id == promptId);
-
+        var template = await promptService.GetPromptTemplateByIdAsync(promptId);
         if (template == null)
-        {
-            return NotFound();
-        }
+            return NotFound("No prompt template found.");
 
         PromptTemplate = template;
-        VariableNames = _promptService.ExtractVariableNames(template.Content);
+        VariableNames = promptService.ExtractVariableNames(template.Content);
         Message = message;
         ErrorMessage = error;
 
         // Load variable collections
-        var collections = await _context.VariableCollections
-            .Where(vc => vc.PromptTemplateId == promptId)
-            .OrderByDescending(vc => vc.CreatedAt)
-            .ToListAsync();
+        var collections = await promptService.GetVariableCollectionsAsync(promptId);
+        if (collections == null)
+        {
+            ErrorMessage = "No variable collections found for this prompt template.";
+            return Page();
+        }
 
-        VariableCollections = collections.Select(vc => new VariableCollectionViewModel
+        VariableCollections = [.. collections.Select(vc => new VariableCollectionViewModel
         {
             Id = vc.Id,
             Name = vc.Name,
@@ -56,14 +43,14 @@ public class IndexModel : PageModel
             PromptTemplateId = vc.PromptTemplateId,
             PromptTemplateName = template.Name,
             VariableSets = string.IsNullOrEmpty(vc.VariableSets)
-                ? new List<VariableSetViewModel>()
+                ? []
                 : JsonSerializer.Deserialize<List<Dictionary<string, string>>>(vc.VariableSets)?
                     .Select(dict => new VariableSetViewModel { Variables = dict })
-                    .ToList() ?? new List<VariableSetViewModel>(),
+                    .ToList() ?? [],
             VariableNames = VariableNames,
             CreatedAt = vc.CreatedAt,
             UpdatedAt = vc.UpdatedAt
-        }).ToList();
+        })];
 
         return Page();
     }
